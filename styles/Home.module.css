@@ -1,0 +1,18 @@
+.main {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+.test {
+  margin: 0.2em;
+}
