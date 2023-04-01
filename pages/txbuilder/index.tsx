@@ -8,7 +8,8 @@ import axios from 'axios';
 
 function Singletx() {
 
-  const tickerAPI = 'http://localhost:3000/api/tickers'
+  //const tickerAPI = 'http://localhost:3000/api/tickers'
+  const tickerAPI = 'https://community-treasury-dapp.netlify.app/api/tickers'
   
   const router = useRouter();
   const { connected, wallet } = useWallet();
