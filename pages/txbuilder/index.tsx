@@ -8,6 +8,8 @@ import axios from 'axios';
 
 function Singletx() {
 
+  const tickerAPI = 'http://localhost:3000/api/tickers'
+  
   const router = useRouter();
   const { connected, wallet } = useWallet();
   const [assets, setAssets] = useState<null | any>(null);
@@ -17,29 +19,33 @@ function Singletx() {
   const [walletTokens, setWalletTokens] = useState([])
   const [walletTokenUnits, setWalletTokenUnits] = useState([])
   const [tokenRates, setTokenRates] = useState({})
-  const [tokens, setTokens] = useState([{"id":"1","name":"ADA","amount":0,"unit":"lovelace"}])
+  const [tokens, setTokens] = useState([{"id":"1","name":"ADA","amount":0,"unit":"lovelace","decimals": 6}])
 
   useEffect(() => {
     if (connected) {
       assignTokens()
-    } else {setTokens([{"id":"1","name":"ADA","amount":0,"unit":"lovelace"}]);}
+    } else {setTokens([{"id":"1","name":"ADA","amount":0,"unit":"lovelace","decimals": 6}]);}
   }, [connected]);
 
   async function assignTokens() {
     let tokenNames = []
+    let tokenFingerprint = []
     let tokenAmounts = []
     let finalTokenAmount = 0
     let tokenUnits = []
+    let tickerDetails = await axios.get(tickerAPI)
+    console.log("tickerDetails",tickerDetails.data.tickerApiNames)
     let walletBalance = await wallet.getBalance();
     const assets = await wallet.getAssets();
-    let tokens = [{"id":"1","name":"ADA","amount":parseFloat(walletBalance[0].quantity/1000000).toFixed(6),"unit":"lovelace"}]
+    let tokens = [{"id":"1","name":"ADA","amount":parseFloat(walletBalance[0].quantity/1000000).toFixed(6),"unit":"lovelace", "decimals": 6, "fingerprint":""}]
     assets.map(asset => {
       if (asset.quantity > 1) {
-        tokenNames.push(asset.assetName)
+        tokenNames.push((asset.assetName).slice(0,4))
+        tokenFingerprint.push(asset.fingerprint)
         tokenUnits.push(asset.unit)
-        if (asset.assetName === 'AGIX') {
+        if (asset.fingerprint === tickerDetails.data.tickerFingerprints[asset.assetName]) {
           console.log("asset.assetName",asset.assetName)
-          finalTokenAmount = asset.quantity/100000000
+          finalTokenAmount = asset.quantity/(10**tickerDetails.data.tickerDecimals[asset.assetName])
         } else {
           finalTokenAmount = asset.quantity/1000000
         }
@@ -52,13 +58,58 @@ function Singletx() {
       tokenNames[index] = "GMBL";
     }
     tokenNames.map((name, index) => {
-      tokens.push(JSON.parse(`{"id":"${index+2}","name":"${name}","amount":${tokenAmounts[index]}, "unit":"${tokenUnits[index]}"}`))
+      tokens.push(JSON.parse(`{"id":"${index+2}","name":"${name}","amount":${tokenAmounts[index]}, "unit":"${tokenUnits[index]}", "fingerprint":"${tokenFingerprint[index]}"}`))
     })
     setWalletTokens(tokens);
     console.log("walletBalance", walletBalance[0].quantity, tokens)
-    await getEchangeRate(tokens)
+    await getAssetDetails(tokens);
+    await getEchangeRate(tokens);
   }
 
+  async function getAssetDetails(tokens) {
+    let updatedTokens = tokens
+    const usedAddresses = await wallet.getUsedAddresses();
+    try {
+      await axios.get(`https://pool.pm/wallet/${usedAddresses[0]}`).then(response => {
+        const details = response.data;
+        console.log("AssestDetails",details);
+        for (let i in response.data.tokens) {
+          if (response.data.tokens[i].decimals) {
+            for (let j in updatedTokens) {
+              if (tokens[j].fingerprint == response.data.tokens[i].fingerprint) {
+                updatedTokens[j]['name'] = response.data.tokens[i].metadata.ticker
+                updatedTokens[j]['decimals'] = 0;
+                updatedTokens[j]['decimals'] = response.data.tokens[i].metadata.decimals;
+              }
+            }
+          }
+        }
+        });
+      // continue with the signed transaction
+    } catch (error) {
+      console.error('An error occurred while signing the transaction:', error);
+      //try api
+      await axios.get(tickerAPI).then(response => {
+        const details = response.data;
+        console.log("AssestDetails",details);
+        for (let i in response.data.tickerApiNames) {
+            for (let j in updatedTokens) {
+              if (tokens[j].fingerprint == response.data.tickerFingerprints[i]) {
+                updatedTokens[j]['name'] = i;
+                updatedTokens[j]['decimals'] = 0;
+                updatedTokens[j]['decimals'] = response.data.tickerDecimals[i];
+              } else {
+                updatedTokens[j]['decimals'] = 6;
+              }
+            }
+        }
+        });
+      // handle the error as appropriate
+    }
+    
+    console.log("New Token Details", updatedTokens)
+    setWalletTokens(updatedTokens);
+  }
   async function getAssets() {
     if (wallet) {
       setLoading(true);
@@ -132,11 +183,10 @@ function Singletx() {
     }
     
     //txHash = await wallet.submitTx(signedTx);
-    let txHash = ""
     try {
       txHash = await wallet.submitTx(signedTx);
       // continue with the signed transaction
-      router.push(`/${txHash}`)
+      
     } catch (error) {
       console.error('An error occurred while signing the transaction:', error);
       //router.push('/cancelwallet')
@@ -154,6 +204,7 @@ function Singletx() {
     const txid = await buildTx(addr, sendAssets, `${adaAmount}`, metadata);
     setDoneTxHash(txid)
     console.log("txid",txid, "doneTxHash", doneTxHash)
+    return txid;
   }
 
   function handleOptionChange(event: { target: { value: SetStateAction<string>; }; }) {
@@ -163,6 +214,7 @@ function Singletx() {
     for (let i in walletTokens) {
       if (walletTokens[i].name == event.target.value) {
         token[event.target.id-1].unit = walletTokens[i].unit
+        token[event.target.id-1].decimals = walletTokens[i].decimals
       }
     }
     setTokens(token);
@@ -178,7 +230,7 @@ function Singletx() {
 
   async function addToken() {
     if (tokens.length < walletTokens.length) {
-      const newToken = {"id": `${tokens.length + 1}`, "name": "ADA", "amount": 0};
+      const newToken = {"id": `${tokens.length + 1}`, "name": "ADA", "amount": 0, "decimals": 6, "fingerprint":""};
       setTokens([...tokens, newToken]);
       console.log("Adding Token", tokens);
     }
@@ -191,10 +243,9 @@ function Singletx() {
   async function getEchangeRate(wallettokens) {
     let currentXchangeRate = ""
     console.log("Exchange Rate wallet tokens", wallettokens)
-    let tickers = {"ADA":"cardano",
-      "AGIX":"singularitynet",
-      "NTX":"nunet",
-      "COPI":"cornucopias"}
+    let tickerDetails = await axios.get(tickerAPI)
+    console.log("tickerDetails",tickerDetails.data.tickerApiNames)
+    let tickers = tickerDetails.data.tickerApiNames;
     let tokenExchangeRates = {}
     for (let i in wallettokens) {
       if (wallettokens[i].name == "ADA") {
@@ -236,12 +287,11 @@ function Singletx() {
     const taskCreator = getValue('id');
     const addr = getValue('addr');
     const id = addr.slice(-6)
-    //const addr = 'addr1q9lvrl7rwv9ypn8zdm3yek525m03walucyysx6ghk3zn845rdcnj6lwu3zw854y76snq07kauuw4uj3s3hz2v6k4t5gq7zxn7j';
     const sendAssets = []
     let adaAmount = 0
-    const results = Object.values(tokens.reduce((acc, { id, name, amount, unit }) => {
+    const results = Object.values(tokens.reduce((acc, { id, name, amount, unit, decimals }) => {
       if (!acc[name]) {
-        acc[name] = { id, name, amount, unit };
+        acc[name] = { id, name, amount, unit, decimals };
       } else {
         acc[name].amount += amount;
       }
@@ -251,8 +301,8 @@ function Singletx() {
     //setTokens(result);
     results.map(token => {
       let x = 0
-      if (token.name == 'AGIX') {
-        x = 100000000
+      if (token.decimals) {
+        x = 10 ** token.decimals
       } else { x = 1000000 }
       if (token.name != 'ADA') {
         sendAssets.push(JSON.parse(`{"unit":"${token.unit}","quantity":"${token.amount * x}"}`))
@@ -317,8 +367,12 @@ function Singletx() {
       copyData = JSON.stringify(copyData, null, 2)
       copyData = JSON.parse(copyData)
       console.log("fileText",copyData)
-    await executeTransaction(addr, sendAssets, adaAmount, copyData)
-    console.log("Getting user input", tokens, id, addr, label, description)
+    let thash = await executeTransaction(addr, sendAssets, adaAmount, copyData)
+    console.log("Getting user input", tokens, id, addr, label, description, thash)
+    console.log("thash",thash)
+    setTimeout(function() {
+      router.push(`/transactions/${thash}`)
+    }, 1000); // 3000 milliseconds = 3 seconds
   }
   
     return (
