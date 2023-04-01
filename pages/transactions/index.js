@@ -12,7 +12,7 @@ function TransactionsList() {
     if (connected) {
       getDandelion()
     }
-  }, [connected, getDandelion]);
+  }, [connected]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   async function getDandelion() {

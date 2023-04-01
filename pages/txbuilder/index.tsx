@@ -25,7 +25,7 @@ function Singletx() {
     if (connected) {
       assignTokens()
     } else {setTokens([{"id":"1","name":"ADA","amount":0.00,"unit":"lovelace","decimals": 6}]);}
-  }, [assignTokens, connected]);
+  }, [connected]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   async function assignTokens() {
@@ -251,12 +251,16 @@ function Singletx() {
     let tickerDetails = await axios.get(tickerAPI)
     console.log("tickerDetails",tickerDetails.data.tickerApiNames)
     let tickers = tickerDetails.data.tickerApiNames;
-    let tokenExchangeRates : {} | any
+    let tokenExchangeRates: any
+    tokenExchangeRates = {}
     for (let i in wallettokens) {
       if (wallettokens[i].name == "ADA") {
         axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${tickers[wallettokens[i].name]}&vs_currencies=usd`).then(response => {
         const rate = response.data[tickers[wallettokens[i].name]].usd;
-        tokenExchangeRates[wallettokens[i].name] = parseFloat(rate).toFixed(3)
+        let exchangeToken: any;
+        exchangeToken = wallettokens[i].name
+        tokenExchangeRates[exchangeToken] = 0.00
+        tokenExchangeRates[exchangeToken] = parseFloat(rate).toFixed(3)
         let xrates: HTMLElement | any
         xrates = document.getElementById('xrate')
         xrates.value = parseFloat(rate).toFixed(3);
@@ -266,7 +270,10 @@ function Singletx() {
       } else if (wallettokens[i].name != "GMBL") {
         axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${tickers[wallettokens[i].name]}&vs_currencies=usd`).then(response => {
         const rate = response.data[tickers[wallettokens[i].name]].usd;
-        tokenExchangeRates[wallettokens[i].name] = parseFloat(rate).toFixed(3)
+        let exchangeToken: any;
+        exchangeToken = wallettokens[i].name
+        tokenExchangeRates[exchangeToken] = 0.00
+        tokenExchangeRates[exchangeToken] = parseFloat(rate).toFixed(3)
         console.log("exchangeAda",rate);
         });
       }
