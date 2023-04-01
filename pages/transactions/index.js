@@ -12,8 +12,9 @@ function TransactionsList() {
     if (connected) {
       getDandelion()
     }
-  }, [connected]);
+  }, [connected, getDandelion]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   async function getDandelion() {
     const usedAddresses = await wallet.getUsedAddresses();
     /*await axios.get('https://postgrest-api.mainnet.dandelion.link')

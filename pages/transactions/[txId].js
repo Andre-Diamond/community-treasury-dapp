@@ -13,7 +13,7 @@ function Post({ post }) {
       console.log("pid",txId)
       testDandelion();
     }
-  }, [connected]);
+  }, [connected, txId]);
 
   if (router.isFallback) {
     return <div>Loading...</div>

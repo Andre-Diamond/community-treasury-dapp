@@ -1,4 +1,4 @@
-import { useEffect, SetStateAction, useState } from 'react'
+import { useEffect, SetStateAction, useState, Key, ReactElement, ReactFragment, ReactPortal, JSXElementConstructor } from 'react'
 import styles from '../../styles/Singletx.module.css'
 import { useWallet } from '@meshsdk/react';
 import { Transaction } from '@meshsdk/core';
@@ -14,30 +14,33 @@ function Singletx() {
   const { connected, wallet } = useWallet();
   const [assets, setAssets] = useState<null | any>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [selectedOption, setSelectedOption] = useState('')
-  const [doneTxHash, setDoneTxHash] = useState('')
-  const [walletTokens, setWalletTokens] = useState([])
-  const [walletTokenUnits, setWalletTokenUnits] = useState([])
-  const [tokenRates, setTokenRates] = useState({})
-  const [tokens, setTokens] = useState([{"id":"1","name":"ADA","amount":0,"unit":"lovelace","decimals": 6}])
+  const [selectedOption, setSelectedOption] = useState<'' | any>('')
+  const [doneTxHash, setDoneTxHash] = useState<'' | any>('')
+  const [walletTokens, setWalletTokens] = useState<[] | any>([])
+  const [walletTokenUnits, setWalletTokenUnits] = useState<[] | any>([])
+  const [tokenRates, setTokenRates] = useState<{} | any>({})
+  const [tokens, setTokens] = useState<[] | any>([{"id":"1","name":"ADA","amount":0.00,"unit":"lovelace","decimals": 6}])
 
   useEffect(() => {
     if (connected) {
       assignTokens()
-    } else {setTokens([{"id":"1","name":"ADA","amount":0,"unit":"lovelace","decimals": 6}]);}
-  }, [connected]);
+    } else {setTokens([{"id":"1","name":"ADA","amount":0.00,"unit":"lovelace","decimals": 6}]);}
+  }, [assignTokens, connected]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   async function assignTokens() {
-    let tokenNames = []
-    let tokenFingerprint = []
-    let tokenAmounts = []
+    let tokenNames: string[] = []
+    let tokenFingerprint: any[] = []
+    let tokenAmounts: any[] = []
     let finalTokenAmount = 0
-    let tokenUnits = []
+    let tokenUnits: any[] = []
     let tickerDetails = await axios.get(tickerAPI)
     console.log("tickerDetails",tickerDetails.data.tickerApiNames)
     let walletBalance = await wallet.getBalance();
     const assets = await wallet.getAssets();
-    let tokens = [{"id":"1","name":"ADA","amount":parseFloat(walletBalance[0].quantity/1000000).toFixed(6),"unit":"lovelace", "decimals": 6, "fingerprint":""}]
+    let totalAmount = parseFloat(walletBalance[0].quantity).toFixed(6)
+    let finalamount = (parseFloat(totalAmount)/1000000).toFixed(6)
+    let tokens = [{"id":"1","name":"ADA","amount":parseFloat(finalamount).toFixed(6),"unit":"lovelace", "decimals": 6, "fingerprint":""}]
     assets.map(asset => {
       if (asset.quantity > 1) {
         tokenNames.push((asset.assetName).slice(0,4))
@@ -47,9 +50,9 @@ function Singletx() {
           console.log("asset.assetName",asset.assetName)
           finalTokenAmount = asset.quantity/(10**tickerDetails.data.tickerDecimals[asset.assetName])
         } else {
-          finalTokenAmount = asset.quantity/1000000
+          finalTokenAmount = (parseFloat(asset.quantity)/1000000)
         }
-        tokenAmounts.push(parseFloat(finalTokenAmount).toFixed(6))
+        tokenAmounts.push((finalTokenAmount).toFixed(6))
       }
     })
     setWalletTokenUnits(tokenUnits);
@@ -66,7 +69,7 @@ function Singletx() {
     await getEchangeRate(tokens);
   }
 
-  async function getAssetDetails(tokens) {
+  async function getAssetDetails(tokens: { id: string; name: string; amount: string; unit: string; decimals: number; fingerprint: string; }[]) {
     let updatedTokens = tokens
     const usedAddresses = await wallet.getUsedAddresses();
     try {
@@ -119,7 +122,7 @@ function Singletx() {
     }
   }
   
-  async function buildTx(addr, sendAssets, adaAmount, metadata) {
+  async function buildTx(addr: any, sendAssets: Asset[], adaAmount: string, metadata: unknown) {
     let txHash = ""
     if (parseInt(adaAmount) > 0) {
       const tx = new Transaction({ initiator: wallet })
@@ -199,7 +202,7 @@ function Singletx() {
     return txHash;
   }
 
-  async function executeTransaction(addr, sendAssets, adaAmount, metadata) {
+  async function executeTransaction(addr: any, sendAssets: any[], adaAmount: number, metadata: string) {
     console.log("executeTransaction",addr, sendAssets, adaAmount, metadata)
     const txid = await buildTx(addr, sendAssets, `${adaAmount}`, metadata);
     setDoneTxHash(txid)
@@ -207,7 +210,7 @@ function Singletx() {
     return txid;
   }
 
-  function handleOptionChange(event: { target: { value: SetStateAction<string>; }; }) {
+  function handleOptionChange(event: { target: { value: SetStateAction<string>, id: SetStateAction<any> }; }) {
     let token = tokens
     setSelectedOption(event.target.value)
     token[event.target.id-1].name = event.target.value
@@ -222,7 +225,7 @@ function Singletx() {
     // Call your function here based on the selected option
   }
 
-  function handleTokenChange(event: { target: { value: string; id: string }; }) {
+  function handleTokenChange(event: { target: { value: string; id: any }; }) {
     const token = tokens[event.target.id - 1];
     token.amount = parseFloat((event.target.value).replace(/\s/g, '').replace(/,/g, '.'));
     setTokens([...tokens]); // create a new array with updated values to trigger a re-render
@@ -236,23 +239,26 @@ function Singletx() {
     }
   }
 
-  function getValue(name){
-    return document.getElementById(name).value
+  function getValue(name: string){
+    let element: HTMLElement | any
+    element = document.getElementById(name)
+    return element.value
   }
 
-  async function getEchangeRate(wallettokens) {
+  async function getEchangeRate(wallettokens: { id: string; name: string; amount: string; unit: string; decimals: number; fingerprint: string; }[]) {
     let currentXchangeRate = ""
     console.log("Exchange Rate wallet tokens", wallettokens)
     let tickerDetails = await axios.get(tickerAPI)
     console.log("tickerDetails",tickerDetails.data.tickerApiNames)
     let tickers = tickerDetails.data.tickerApiNames;
-    let tokenExchangeRates = {}
+    let tokenExchangeRates : {} | any
     for (let i in wallettokens) {
       if (wallettokens[i].name == "ADA") {
         axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${tickers[wallettokens[i].name]}&vs_currencies=usd`).then(response => {
         const rate = response.data[tickers[wallettokens[i].name]].usd;
         tokenExchangeRates[wallettokens[i].name] = parseFloat(rate).toFixed(3)
-        let xrates = document.getElementById('xrate')
+        let xrates: HTMLElement | any
+        xrates = document.getElementById('xrate')
         xrates.value = parseFloat(rate).toFixed(3);
         currentXchangeRate = parseFloat(rate).toFixed(3);
         console.log("exchangeAda",rate);
@@ -269,12 +275,16 @@ function Singletx() {
     console.log("tokenExchangeRates",tokenExchangeRates)
   }
 
-  async function getTotalTokens(results) {
+  async function getTotalTokens(results: [] | any) {
     let totalTokensPrep = ""
     for (let i in results) {
       if (results[i].name != "GMBL") {
+        let gmblNumber: any
+        let gmblNumber2: any
+        gmblNumber = parseFloat(results[i].amount)
+        gmblNumber2 = (gmblNumber * tokenRates[results[i].name]).toFixed(3)
         totalTokensPrep = `${totalTokensPrep}
-      "${parseFloat(results[i].amount * tokenRates[results[i].name]).toFixed(3)} USD in ${results[i].amount} ${results[i].name}",`
+      "${gmblNumber2} USD in ${results[i].amount} ${results[i].name}",`
       } else if (results[i].name == "GMBL") {
         totalTokensPrep = `${totalTokensPrep}
       "0 USD in ${results[i].amount} ${results[i].name}",`
@@ -287,9 +297,10 @@ function Singletx() {
     const taskCreator = getValue('id');
     const addr = getValue('addr');
     const id = addr.slice(-6)
-    const sendAssets = []
+    const sendAssets: any[] = []
     let adaAmount = 0
-    const results = Object.values(tokens.reduce((acc, { id, name, amount, unit, decimals }) => {
+    let results: any[]
+    results = Object.values(tokens.reduce((acc: { [x: string]: { amount: any; id: any; name: any; unit: any; decimals: any;}; }, { id, name, amount, unit, decimals }: any) => {
       if (!acc[name]) {
         acc[name] = { id, name, amount, unit, decimals };
       } else {
@@ -392,7 +403,7 @@ function Singletx() {
                     autoComplete="off"
                     required
                 />
-                <span className={styles.placeholder}>Your Organization or Project's name</span>
+                <span className={styles.placeholder}>Your Organization or Project&apos;s name</span>
                 <span className={styles.tag}>Task Creator</span>
               </label>
             </div>
@@ -450,7 +461,7 @@ function Singletx() {
           {connected && (
             <>
               <div className={styles.tokens}>
-              {tokens.map(token => {
+              {tokens.map((token: { id: Key | any | undefined; name: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | ReactFragment | ReactPortal | null | undefined; }) => {
                 return (
                   <div className={styles.token} key={token.id}>
                     <div className={styles.tokenitem}>
@@ -467,7 +478,7 @@ function Singletx() {
                         <span className={styles.tag}>{token.name}</span>
                       </label>
                       <select name="" id={token.id} className={styles.selecttoken} onChange={handleOptionChange}>
-                          {walletTokens.map(token => {
+                          {walletTokens.map((token: { id: Key | any | undefined; name: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | ReactFragment | any | undefined; }) => {
                             return (                
                               <option key={token.id} value={token.name}>{token.name}</option>
                             )
@@ -491,7 +502,7 @@ function Singletx() {
           <div className={styles.balances}>
             <div><h2>Token Balances</h2></div>
             <div>
-            {walletTokens.map(token => {
+            {walletTokens.map((token: { id: Key | null | undefined; name: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | ReactFragment | ReactPortal | null | undefined; amount: string | number | boolean | ReactElement<any, string | JSXElementConstructor<any>> | ReactFragment | ReactPortal | null | undefined; }) => {
               return (                
                 <p key={token.id}>{token.name} {token.amount}</p>
               )
